@@ -1,0 +1,10 @@
+[Unit]
+Description=Jellyfin NAS Suspend server
+After=network.target
+
+[Service]
+ExecStart=/usr/local/bin/jellyfin-nas-suspend.py --config /etc/jellyfin-nas-suspend/config.json
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
