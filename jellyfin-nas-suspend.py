@@ -70,10 +70,6 @@ def log_watcher_thread():
         except FileNotFoundError:
             print("[ERROR] inotifywait or wakeonlan not found.")
             break
-        
-
-
-        
 
 
 class Nas:
@@ -145,6 +141,9 @@ def main():
 
     nas = Nas(host, port, mac)
     
+        
+    watcher_thread = threading.Thread(target=log_watcher_thread, daemon=True)
+
     while True:
         try:
             item = JELLYFIN_ACTIVITY.get(timeout=300)
