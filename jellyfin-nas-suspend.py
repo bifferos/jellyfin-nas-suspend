@@ -27,6 +27,7 @@ JELLYFIN_ACTIVITY = queue.Queue()
 STATE_REQUESTS = queue.Queue()
 
 
+# Not used, may add session monitoring later.
 class Jellyfin:
     def __init__(self, token):
         self.token = token
