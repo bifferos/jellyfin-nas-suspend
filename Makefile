@@ -23,6 +23,10 @@ install:
 	@echo "Installed and started $(SERVICE_FILE)"
 
 
+info:
+	systemctl status $(SERVICE_FILE)
+
+
 uninstall:
 	sudo systemctl disable --now $(APP_NAME).service
 	sudo rm -f $(INSTALL_DIR)/$(BINARY_NAME)
