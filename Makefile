@@ -1,4 +1,4 @@
-.PHONY: run clean install uninstall
+.PHONY: run clean install uninstall logs info
 
 
 APP_NAME := jellyfin-nas-suspend
@@ -29,6 +29,10 @@ install:
 
 info:
 	systemctl status $(SERVICE_FILE)
+	
+	
+logs:
+	journalctl -u $(SERVICE_FILE) -n 20
 
 
 uninstall:
