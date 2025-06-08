@@ -1,8 +1,8 @@
 {
- "logs": "./logs",
- "nas_host": "172.16.16.13",
- "nas_port": 6061,
- "nas_mac": "a8:a1:59:2b:6a:9d",
- "idle": 30,
- "poll": 5
+ "jellyfin_log_dir": "./logs",
+ "remote_nas_host": "172.16.16.13",
+ "remote_nas_port": 6061,
+ "remote_nas_mac": "a8:a1:59:2b:6a:9d",
+ "idle_time": 30,
+ "poll_interval": 5
 }

@@ -163,20 +163,26 @@ def main():
     else:
         config = {}
 
-    logs = config.get('logs', "/var/log/jellyfin")
-    host = config.get('nas_host', "0.0.0.0")
-    port = config.get('nas_port', 6061)
-    mac = config.get('nas_mac', None)
-    idle_time = config.get('idle', 300)
-    poll_interval = config.get('poll', 30)
+    logs = config.get('jellyfin_log_dir', "/var/log/jellyfin")
+    host = config.get('remote_nas_host', "0.0.0.0")
+    port = config.get('remote_nas_port', 6061)
+    mac = config.get('remote_nas_mac', None)
+    idle_time = config.get('idle_time', 300)
+    poll_interval = config.get('poll_interval', 30)
 
+    print("Using configuration:")
+    print(f"  jellyfin_log_dir: {logs}")
+    print(f"  remote_nas_host: {host}")
+    print(f"  remote_nas_port: {port}")
+    print(f"  remote_nas_mac: {mac}")
+    print(f"  idle_time: {idle_time}")
+    print(f"  poll_interval: {poll_interval}")
 
     if not mac:
-        sys.exit("No NAS mac address provided in config, need one.")
+        sys.exit("No NAS mac address provided in config, need one to wake something.")
 
     nas = Nas(host, port, mac)
-    
-        
+
     watcher_thread = threading.Thread(target=log_watcher_thread, args=(logs,poll_interval), daemon=True)
     watcher_thread.start()
 
@@ -193,7 +199,6 @@ def main():
             nas.suspend()
         else:
             nas.wake_up()
-
 
 
 if __name__ == "__main__":
