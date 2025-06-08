@@ -15,7 +15,7 @@ import json
 import time
 from argparse import ArgumentParser
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 import queue
 import threading
 import subprocess
@@ -71,6 +71,7 @@ def session_watcher_thread(token, poll_interval):
         if latest_activity > latest_session:
             latest_session = latest_activity
             JELLYFIN_ACTIVITY.put("sessions")
+            time.sleep(poll_interval)
 
 
 class JellyfinEventHandler(pyinotify.ProcessEvent):
@@ -155,6 +156,9 @@ class Nas:
         """Wake up the NAS"""
         print("NAS wake_up()")
         max_attempts = 15
+        if self.ping():
+            print("NAS already awake")
+            return
         while (not self.ping()) and max_attempts:
             self.wake_on_lan()
             # Wake-up can take a while
@@ -165,11 +169,12 @@ class Nas:
         print("Successfully woken")
 
     def suspend(self):
-        """Put to sleep the nas"""
+        """Put to sleep the nas.  Should poll multiple times because any ping response may get lost.
+            That's OK, it'll just be put to sleep at the following idle interval"""
         print("NAS suspend()")
         max_attempts = 15
         while (self.ping()) and max_attempts:
-            print("Sending suspend packet")
+            print(f"Sending suspend packet to {self.host}:{self.port}")
             self.suspend_socket.sendto(b"suspend", (self.host, self.port))
             max_attempts =- 1
         if max_attempts == 0:
@@ -221,8 +226,8 @@ def main():
 
     while True:
         try:
-            JELLYFIN_ACTIVITY.get(timeout=idle_time)
-            print("Returned from activity poll, doesn't need sleep")
+            activity_type = JELLYFIN_ACTIVITY.get(timeout=idle_time)
+            print(f"Returned from activity poll, jellyfin active due to '{activity_type}'")
             needs_sleep = False
         except queue.Empty:
             print("Returned from activity poll, no activity, needs sleep")
