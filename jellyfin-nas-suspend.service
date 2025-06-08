@@ -5,6 +5,9 @@ After=network.target
 [Service]
 ExecStart=/usr/local/bin/jellyfin-nas-suspend.py --config /etc/jellyfin-nas-suspend/config.json
 Restart=on-failure
+StandardOutput=journal
+StandardError=journal
+Environment=PYTHONUNBUFFERED=1
 
 [Install]
 WantedBy=multi-user.target
