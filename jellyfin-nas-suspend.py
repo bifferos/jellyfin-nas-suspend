@@ -32,20 +32,45 @@ class Jellyfin:
         self.port = 8096
 
     def get_session_list(self):
-        resp = requests.get(f"http://{self.host}:{self.port}/Sessions", headers={"X-Emby-Token": self.token})
-        session_list = resp.json()
-        return session_list
+        try:
+            resp = requests.get(f"http://{self.host}:{self.port}/Sessions", headers={"X-Emby-Token": self.token}, timeout=5)
+            resp.raise_for_status()
+            return resp.json()
+        except (requests.RequestException, ValueError):
+            print("API call failed, Jellyfin offline or token invalid?")
+            return None
 
     def latest_activity(self):
         all_dates = []
         session_list = self.get_session_list()
+        if session_list is None:
+            return None
         for session in session_list:
             iso_str = session["LastActivityDate"]
             iso_date = datetime.fromisoformat(iso_str)
             all_dates.append(iso_date)
 
         all_dates.sort()
+        if len(all_dates) == 0:
+            return None
         return all_dates[-1]
+        
+        
+def session_watcher_thread(token, poll_interval):
+    """Session watcher is not as responsive as log watcher, so this is more for keeping the NAS on
+        rather than waking it up, still handy to have a fallback in case logs go quiet"""
+    JELLYFIN_ACTIVITY.put("session watcher startup")
+    date_now = datetime.now(tz=timezone.utc)
+    very_old = date_now - timedelta(days=360)
+    latest_session = very_old
+    jellyfin_api = Jellyfin(token)
+    while True:
+        latest_activity = jellyfin_api.latest_activity()
+        if latest_activity is None:
+            continue
+        if latest_activity > latest_session:
+            latest_session = latest_activity
+            JELLYFIN_ACTIVITY.put("sessions")
 
 
 class JellyfinEventHandler(pyinotify.ProcessEvent):
@@ -66,7 +91,7 @@ class JellyfinEventHandler(pyinotify.ProcessEvent):
 
 
 def log_watcher_thread(log_dir, poll_interval):
-    JELLYFIN_ACTIVITY.put("startup")
+    JELLYFIN_ACTIVITY.put("log watcher startup")
 
     wm = pyinotify.WatchManager()
     mask = pyinotify.IN_CREATE | pyinotify.IN_MODIFY
@@ -164,6 +189,7 @@ def main():
         config = {}
 
     logs = config.get('jellyfin_log_dir', "/var/log/jellyfin")
+    token = config.get('jellyfin_token', None)
     host = config.get('remote_nas_host', "0.0.0.0")
     port = config.get('remote_nas_port', 6061)
     mac = config.get('remote_nas_mac', None)
@@ -172,6 +198,7 @@ def main():
 
     print("Using configuration:")
     print(f"  jellyfin_log_dir: {logs}")
+    print(f"  jellyfin_token: {token}")
     print(f"  remote_nas_host: {host}")
     print(f"  remote_nas_port: {port}")
     print(f"  remote_nas_mac: {mac}")
@@ -183,8 +210,14 @@ def main():
 
     nas = Nas(host, port, mac)
 
-    watcher_thread = threading.Thread(target=log_watcher_thread, args=(logs,poll_interval), daemon=True)
-    watcher_thread.start()
+    # We're always going to watch at least the log
+    log_watcher = threading.Thread(target=log_watcher_thread, args=(logs,poll_interval), daemon=True)
+    log_watcher.start()
+    
+    if token is not None:
+        session_watcher = threading.Thread(target=session_watcher_thread, args=(token,poll_interval), daemon=True)
+        session_watcher.start()
+        
 
     while True:
         try:
