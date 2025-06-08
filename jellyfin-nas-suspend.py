@@ -3,7 +3,7 @@
 """
     Run on a Jellyfin to suspend/wake your NAS
 
-    requires inotify-tools.
+    requires python3-pyinotify.
 """
 
 
