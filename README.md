@@ -7,7 +7,7 @@ Installation
 ============
 
 On the NAS PC:
-Following the instructions to install:
+Follow the instructions to install:
 https://github.com/bifferos/suspend-server
 
 On the Jellyfin PC:
@@ -25,13 +25,17 @@ $ vim config.json
 
 Check the log path is right for Jellyfin, usually 
 /var/log/jellyfin
-Make sure it works as you want by running first outside
+Set idle time and poll interval to something low for testing,
+then I suggest you raise it to 300 and 30 for production.  
+This gives suspend after 5 minutes of idle, and checks every
+30 seconds.
+Make sure it works as you intended by running first outside
 systemd:
 
 $ make run
 
-This will allow you to easily see the text output telling
-you what it's doing.
+This will allow you to see the text output telling you what
+it's doing without journalctl commands.
 
 Finally install the systemd service on Jellyfin to start
 the service and have it run at boot:
