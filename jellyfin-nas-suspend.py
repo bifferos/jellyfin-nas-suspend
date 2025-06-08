@@ -1,27 +1,26 @@
 #!/usr/bin/env python3
 
 """
-    Run on a Jellyfin to suspend/wake your nas
+    Run on a Jellyfin to suspend/wake your NAS
 
     requires inotify-tools.
 """
 
 
 import sys
+import pyinotify
 import requests
 import socket
 import json
 import time
 from argparse import ArgumentParser
 from pathlib import Path
-from datetime import datetime, timezone, timedelta
-import configparser
+from datetime import datetime
 import queue
 import threading
 import subprocess
 
 
-# Initially just the logfiles, could add other sources and push them here.
 JELLYFIN_ACTIVITY = queue.Queue()
 
 
@@ -49,28 +48,41 @@ class Jellyfin:
         return all_dates[-1]
 
 
+class JellyfinEventHandler(pyinotify.ProcessEvent):
+    def __init__(self, queue, poll_interval):
+        self.queue = queue
+        self.poll_interval = poll_interval
+
+    def process_IN_CREATE(self, event):
+        self._handle_event()
+
+    def process_IN_MODIFY(self, event):
+        self._handle_event()
+
+    def _handle_event(self):
+        print("Encountered Jellyfin activity")
+        self.queue.put("logs")
+        time.sleep(self.poll_interval)  # idle buffer before next check
+
+
 def log_watcher_thread(log_dir, poll_interval):
     JELLYFIN_ACTIVITY.put("startup")
-    while True:
-        try:
-            # Run inotifywait with timeout
-            result = subprocess.run(
-                ['inotifywait', '-e', 'create', '-e', 'modify', log_dir],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL
-            )
-            
-            if result.returncode == 0:
-                print("Encountered Jellyfin activity")
-                JELLYFIN_ACTIVITY.put("logs")
-                time.sleep(poll_interval)  # idle buffer before next check
-            else:
-                print(f"[ERROR] inotifywait exited with code {result.returncode}")
-                break  # Exit thread on non-retryable error
 
-        except FileNotFoundError:
-            print("[ERROR] inotifywait or wakeonlan not found.")
-            break
+    wm = pyinotify.WatchManager()
+    mask = pyinotify.IN_CREATE | pyinotify.IN_MODIFY
+
+    handler = JellyfinEventHandler(JELLYFIN_ACTIVITY, poll_interval)
+    notifier = pyinotify.Notifier(wm, handler)
+
+    try:
+        wm.add_watch(log_dir, mask, rec=False)
+        notifier.loop()
+    except KeyboardInterrupt:
+        print("[INFO] Log watcher interrupted")
+    except Exception as e:
+        print(f"[ERROR] {e}")
+    finally:
+        notifier.stop()
 
 
 def get_local_ip_for_target(target_ip):
@@ -170,11 +182,11 @@ def main():
 
     while True:
         try:
-            item = JELLYFIN_ACTIVITY.get(timeout=idle_time)
-            print("Returned from acitivty poll, doesn't need sleep")
+            JELLYFIN_ACTIVITY.get(timeout=idle_time)
+            print("Returned from activity poll, doesn't need sleep")
             needs_sleep = False
         except queue.Empty:
-            print("Returned from acitivty poll, no activity, needs sleep")
+            print("Returned from activity poll, no activity, needs sleep")
             needs_sleep = True
 
         if needs_sleep:
